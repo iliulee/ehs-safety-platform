@@ -15,6 +15,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       'exceljs': path.resolve(__dirname, 'node_modules/exceljs/dist/exceljs.min.js'),
+      'jieba-wasm/pkg/web/jieba_rs_wasm_bg.wasm': path.resolve(
+        __dirname,
+        'node_modules/jieba-wasm/pkg/web/jieba_rs_wasm_bg.wasm',
+      ),
     },
   },
   define: {
@@ -23,6 +27,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
+      external: [/^@node-rs\/jieba/],
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],

@@ -1,6 +1,7 @@
 import { db, generateId, now } from '@/db'
 import type { KnowledgeDocument, KnowledgeChunk, RetrievalHit, ChunkProgress } from '@/types'
 import { tokenize, BM25Searcher } from './bm25.service'
+import { ensureTokenizer } from './tokenizer.adapter'
 import { chunkText } from './chunker.service'
 import { extractTextFromFile } from './text-extractor.service'
 
@@ -277,6 +278,7 @@ class RagKnowledgeService {
   }
 
   private async _doInit(): Promise<void> {
+    await ensureTokenizer()
     await this.seedBuiltInDocs()
     await this.rebuildIndex()
   }

@@ -1,5 +1,6 @@
 import { db, generateId, now } from '@/db'
 import type { KnowledgeItem } from '@/types'
+import { tokenize, ensureTokenizer } from './tokenizer.adapter'
 
 const BUILT_IN_KNOWLEDGE: Omit<KnowledgeItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
@@ -92,6 +93,8 @@ export interface RetrievalResult {
 
 class KnowledgeRetrievalService {
   private async ensureBuiltInKnowledge(): Promise<void> {
+    await ensureTokenizer()
+
     const count = await db.knowledgeItems.where('isBuiltIn').equals(1 as any).count()
     if (count === 0) {
       for (const item of BUILT_IN_KNOWLEDGE) {
@@ -132,43 +135,19 @@ class KnowledgeRetrievalService {
     await db.knowledgeItems.delete(id)
   }
 
-  private tokenize(text: string): string[] {
-    const cleaned = text.toLowerCase().replace(/[^\u4e00-\u9fa5a-z0-9\s]/g, ' ')
-    const words: string[] = []
-    for (let i = 0; i < cleaned.length; i++) {
-      const char = cleaned[i]
-      if (/[\u4e00-\u9fa5]/.test(char)) {
-        words.push(char)
-        if (i < cleaned.length - 1 && /[\u4e00-\u9fa5]/.test(cleaned[i + 1])) {
-          words.push(cleaned.slice(i, i + 2))
-        }
-      } else if (/[a-z0-9]/.test(char)) {
-        let j = i
-        let word = ''
-        while (j < cleaned.length && /[a-z0-9]/.test(cleaned[j])) {
-          word += cleaned[j]
-          j++
-        }
-        words.push(word)
-        i = j - 1
-      }
-    }
-    return words.filter(w => w.length > 0)
-  }
-
   async retrieve(query: string, topK: number = 5): Promise<RetrievalResult[]> {
     await this.ensureBuiltInKnowledge()
     const allItems = await db.knowledgeItems.toArray()
-    const queryTokens = this.tokenize(query)
+    const queryTokens = tokenize(query)
 
     if (queryTokens.length === 0) return []
 
     const results: RetrievalResult[] = []
 
     for (const item of allItems) {
-      const titleTokens = this.tokenize(item.title)
-      const contentTokens = this.tokenize(item.content)
-      const tagTokens = item.tags ? this.tokenize(item.tags.join(' ')) : []
+      const titleTokens = tokenize(item.title)
+      const contentTokens = tokenize(item.content)
+      const tagTokens = item.tags ? tokenize(item.tags.join(' ')) : []
 
       let score = 0
       const titleMatches = new Set<string>()
