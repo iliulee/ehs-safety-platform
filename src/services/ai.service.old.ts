@@ -1,4 +1,3 @@
-import OpenAI from 'openai'
 import { db, generateId, now } from '@/db'
 import type { AiChatMessage, AiSession } from '@/types'
 
@@ -44,14 +43,6 @@ class AiService {
     }
   }
 
-  private createClient(settings: AiSettings): OpenAI {
-    return new OpenAI({
-      baseURL: settings.baseUrl,
-      apiKey: settings.apiKey,
-      dangerouslyAllowBrowser: true,
-    })
-  }
-
   async saveSettings(settings: Partial<AiSettings>): Promise<void> {
     if (settings.apiKey !== undefined) {
       await db.settings.put({ key: 'ai_api_key', value: settings.apiKey, updatedAt: now() })
@@ -75,41 +66,66 @@ class AiService {
       throw new Error('请先在设置中配置DeepSeek API Key')
     }
 
-    const client = this.createClient(settings)
-
-    if (stream) {
-      return this.handleStreamResponse(client, settings.model, messages, onChunk)
-    }
-
-    const completion = await client.chat.completions.create({
-      model: settings.model,
-      messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-      temperature: 0.3,
+    const response = await fetch(`${settings.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${settings.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: settings.model,
+        messages,
+        stream,
+        temperature: 0.3,
+      }),
     })
 
-    return completion.choices[0]?.message?.content || ''
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`API请求失败: ${response.status} ${errorText}`)
+    }
+
+    if (stream && response.body) {
+      return this.handleStreamResponse(response.body, onChunk)
+    } else {
+      const data = await response.json()
+      return data.choices[0]?.message?.content || ''
+    }
   }
 
   private async handleStreamResponse(
-    client: OpenAI,
-    model: string,
-    messages: ChatMessage[],
+    body: ReadableStream<Uint8Array>,
     onChunk?: (chunk: string) => void
   ): Promise<string> {
-    const stream = await client.chat.completions.create({
-      model,
-      messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-      stream: true,
-      temperature: 0.3,
-    })
-
+    const reader = body.getReader()
+    const decoder = new TextDecoder()
     let fullContent = ''
+    let buffer = ''
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || ''
-      if (content) {
-        fullContent += content
-        onChunk?.(content)
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed || !trimmed.startsWith('data: ')) continue
+        const data = trimmed.slice(6)
+        if (data === '[DONE]') continue
+
+        try {
+          const parsed = JSON.parse(data)
+          const chunk = parsed.choices[0]?.delta?.content || ''
+          if (chunk) {
+            fullContent += chunk
+            onChunk?.(chunk)
+          }
+        } catch {
+          // ignore parse errors
+        }
       }
     }
 
