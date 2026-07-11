@@ -1,0 +1,8 @@
+export { projectService } from './projectService'
+export { workerService } from './workerService'
+export { hazardService } from './hazardService'
+export { dictService } from './dictService'
+export { statisticsService } from './statisticsService'
+export { acceptanceService } from './acceptanceService'
+export { meetingService } from './meetingService'
+export { correspondenceService } from './correspondenceService'

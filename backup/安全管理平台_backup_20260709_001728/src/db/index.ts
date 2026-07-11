@@ -1,0 +1,140 @@
+import Dexie, { type Table } from 'dexie'
+import type {
+  Project,
+  Subcontractor,
+  Worker,
+  Certificate,
+  EducationRecord,
+  TrainingRecord,
+  DailyLog,
+  Hazard,
+  HazardSource,
+  DangerousProject,
+  WorkPermit,
+  Acceptance,
+  Meeting,
+  Correspondence,
+  Template,
+  CategoryRecord,
+  AiChatMessage,
+  AiSession,
+  KnowledgeItem,
+  KnowledgeDocument,
+  KnowledgeChunk,
+  AiGeneration,
+  DictItem,
+  SettingItem,
+  PpeItem,
+  Equipment,
+  EmergencyPlan,
+  EmergencySupply,
+  EmergencyDrill,
+  AccidentRecord,
+  SafetyCost,
+} from '@/types'
+
+export class ZhianDB extends Dexie {
+  projects!: Table<Project, string>
+  subcontractors!: Table<Subcontractor, string>
+  workers!: Table<Worker, string>
+  certificates!: Table<Certificate, string>
+  educationRecords!: Table<EducationRecord, string>
+  trainingRecords!: Table<TrainingRecord, string>
+  dailyLogs!: Table<DailyLog, string>
+  hazards!: Table<Hazard, string>
+  hazardSources!: Table<HazardSource, string>
+  dangerousProjects!: Table<DangerousProject, string>
+  workPermits!: Table<WorkPermit, string>
+  acceptances!: Table<Acceptance, string>
+  meetings!: Table<Meeting, string>
+  correspondences!: Table<Correspondence, string>
+  categories!: Table<CategoryRecord, string>
+  templates!: Table<Template, string>
+  aiChatMessages!: Table<AiChatMessage, string>
+  aiSessions!: Table<AiSession, string>
+  knowledgeItems!: Table<KnowledgeItem, string>
+  knowledgeDocuments!: Table<KnowledgeDocument, string>
+  knowledgeChunks!: Table<KnowledgeChunk, string>
+  aiGenerations!: Table<AiGeneration, string>
+  dictItems!: Table<DictItem, string>
+  settings!: Table<SettingItem, string>
+  // v4.0 新增
+  ppeItems!: Table<PpeItem, string>
+  equipment!: Table<Equipment, string>
+  emergencyPlans!: Table<EmergencyPlan, string>
+  emergencySupplies!: Table<EmergencySupply, string>
+  emergencyDrills!: Table<EmergencyDrill, string>
+  accidentRecords!: Table<AccidentRecord, string>
+  safetyCosts!: Table<SafetyCost, string>
+
+  constructor() {
+    super('liuge_safety')
+
+    this.version(1).stores({
+      projects: '&id, name, code, status, createdAt',
+      subcontractors: '&id, name, code, status, projectId, createdAt',
+      workers: '&id, name, idCard, workType, subcontractorId, projectId, status, entryDate, createdAt',
+      certificates: '&id, workerId, certType, expiryDate, createdAt',
+      educationRecords: '&id, date, type, projectId, createdAt',
+      trainingRecords: '&id, date, type, projectId, createdAt',
+      dailyLogs: '&id, date, projectId, recorder, createdAt',
+      hazards: '&id, level, category, status, projectId, rectifyDeadline, reporterId, createdAt',
+      hazardSources: '&id, category, level, status, projectId, responsiblePersonId, createdAt',
+      dangerousProjects: '&id, category, level, status, projectId, startDate, endDate, createdAt',
+      workPermits: '&id, type, status, projectId, applicantId, startTime, endTime, createdAt',
+      acceptances: '&id, type, date, result, projectId, createdAt',
+      meetings: '&id, type, date, projectId, host, createdAt',
+      correspondences: '&id, direction, type, date, docNumber, projectId, status, createdAt',
+      templates: '&id, name, category, type, isBuiltIn, createdAt',
+      aiChatMessages: '&id, sessionId, role, timestamp, createdAt',
+      aiSessions: '&id, lastMessageAt, createdAt',
+      knowledgeItems: '&id, title, category, source, isBuiltIn, createdAt',
+      aiGenerations: '&id, type, status, projectId, templateId, createdAt',
+      dictItems: '&id, category, code, enabled, sortOrder, createdAt',
+      settings: '&key, createdAt',
+    })
+
+    this.version(2).stores({
+      categories: '&id, code, parentId, sortOrder, [parentId+sortOrder], isBuiltIn',
+      templates:
+        '&id, name, category, categoryId, type, isBuiltIn, fileType, contentType, createdAt, [name+fileSize+categoryId]',
+    })
+
+    this.version(3).stores({
+      projects: '&id, name, code, status, createdAt',
+    })
+
+    this.version(4).upgrade((tx) => {
+      tx.table('categories').clear()
+      tx.table('templates').clear()
+    })
+
+    this.version(5).stores({
+      knowledgeDocuments: '&id, title, category, fileType, isBuiltIn, importStatus, createdAt',
+      knowledgeChunks: '&id, docId, chunkIndex, category, isBuiltIn, createdAt, [docId+chunkIndex]',
+    }).upgrade(() => {
+      // 旧的 knowledgeItems 数据保留，新RAG系统走新表
+    })
+
+    // v4.0 新增 6 个模块表
+    this.version(6).stores({
+      ppeItems: '&id, name, category, status, projectId, createdAt',
+      equipment: '&id, name, category, status, projectId, entryDate, createdAt',
+      emergencyPlans: '&id, name, category, projectId, createdAt',
+      emergencySupplies: '&id, name, category, status, projectId, expiryDate, createdAt',
+      emergencyDrills: '&id, title, drillType, date, projectId, createdAt',
+      accidentRecords: '&id, title, accidentType, severity, occurrenceDate, status, projectId, createdAt',
+      safetyCosts: '&id, date, category, projectId, createdAt',
+    })
+  }
+}
+
+export const db = new ZhianDB()
+
+export function generateId(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+}
+
+export function now(): number {
+  return Date.now()
+}
