@@ -41,10 +41,10 @@
 | Word | docxtemplater + pizzip | 3.47 + 3.1 |
 | Excel | ExcelJS | 4.4 |
 | 图表 | Chart.js + react-chartjs-2 | 4.4 + 5.2 |
-| 检索 | MiniSearch | 7+ （📦 待安装） |
-| AI | openai (OpenAI SDK) | 4+ （📦 待安装） |
-| 切分 | @langchain/textsplitters | latest （📦 待安装） |
-| 分词 | @node-rs/jieba | latest （📦 待安装） |
+| 检索 | MiniSearch | 7+ ✅ |
+| AI | openai (OpenAI SDK) | 4+ ✅ |
+| 切分 | @langchain/textsplitters | latest ✅ |
+| 分词 | @node-rs/jieba | latest ✅ |
 
 ## 每次交代码前
 

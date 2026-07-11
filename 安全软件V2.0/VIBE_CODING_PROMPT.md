@@ -154,10 +154,10 @@ npx playwright test       # 截图验证 → 页面无错乱
 | Excel | ExcelJS 4 | ✅ 已安装 |
 | Word编辑 | @eigenpal/docx-editor-react | ✅ 已安装 |
 | Excel编辑 | @univerjs/sheets + @univerjs/ui | ✅ 已安装 |
-| 检索 | MiniSearch 7 | v5.0 待安装 | 📦 npm install minisearch |
-| AI | openai (OpenAI Node SDK) 4 | v5.0 待安装 | 📦 npm install openai |
-| 切分 | @langchain/textsplitters | v5.0 待安装 | 📦 npm install @langchain/textsplitters |
-| 分词 | @node-rs/jieba | v5.0 待安装 | 📦 npm install @node-rs/jieba |
+| 检索 | MiniSearch 7 | ✅ 已安装 | — |
+| AI | openai (OpenAI Node SDK) 4 | ✅ 已安装 | — |
+| 切分 | @langchain/textsplitters | ✅ 已安装 | — |
+| 分词 | @node-rs/jieba | ✅ 已安装 | — |
 
 ### 目录结构（关键路径）
 
