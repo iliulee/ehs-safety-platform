@@ -46,6 +46,18 @@
 | 切分 | @langchain/textsplitters | latest ✅ |
 | 分词 | @node-rs/jieba | latest ✅ |
 
+## 已知待修 Bug（v5.0 改造期间不要动这些区域）
+
+溜哥正在修这些 bug，改造模块时不要碰相关文件，避免引入新问题：
+
+| # | Bug | 涉及文件 | 现象 |
+|---|-----|---------|------|
+| 1 | 模板库新建分类不显示 | `src/pages/templates/`、`src/db/` | 提示"新建成功"但界面不刷新，文件夹不出现 |
+| 2 | 模板变量只能输入一个字 | `src/pages/templates/components/` | 打开 Word 模板 → 变量面板 → 新增变量，输入一个字后无法继续输入 |
+| 3 | Word 加载一直转圈 | `src/pages/templates/`、`src/services/templateService.ts` | 加载 Word 文件时卡在 loading，需刷新整个页面才能加载 |
+
+**原则**：当前 v5.0 改造只改 services 层的分词、AI、切分、检索 4 个模块，不碰模板库 UI 和页面逻辑。
+
 ## 每次交代码前
 
 - [ ] 有没有自研代码可用成熟库替代？
@@ -53,3 +65,4 @@
 - [ ] `npx vite build` 通过？
 - [ ] 有没有引入 `any` 类型？
 - [ ] 有没有吞掉异常（空 catch）？
+- [ ] 有没有碰模板库的 UI 组件？（当前禁止）
