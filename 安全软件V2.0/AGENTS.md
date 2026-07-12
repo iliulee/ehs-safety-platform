@@ -2,6 +2,44 @@
 
 > Trae 每次开新会话自动加载本文件。不要删除。
 
+## 🎯 v6.0 MVP 切入口（2 天交付）
+
+**目标**：以"安全施工日志"为引爆点，跑通最小可用闭环。
+
+### MVP 三大能力
+
+| 能力 | 选型 | 验证 | 状态 |
+|------|------|------|------|
+| 1. 身份证 OCR 自动填工人 | `tesseract.js` v7（37.4k dependents） | 拍照身份证 → 自动填入 workers 表 | ✅ 已安装 |
+| 2. 设备铭牌 OCR | `tesseract.js` v7 + chi_sim | 拍照设备 → 识别编号 | ✅ 复用 |
+| 3. AI 文字拆解 | OpenAI SDK + zod schema | 微信语音输入文字 → AI 拆解到各表 | ✅ 复用模块 2 |
+
+**核心理念**：用现成库，不自研；用现有表，不新建；用 DailyReportPage，不做新页面。
+
+### Day 1（今天）：OCR 接入
+- `src/services/ocr.service.ts` 新建
+- 工人页加"拍照录入身份证"入口
+- 设备页加"拍照识别铭牌"入口
+- tsc + vite build 门禁通过 → commit
+
+### Day 2（明天）：AI 拆解 + 日志生成
+- `src/services/ai-parser.service.ts` 新建（zod schema 约束）
+- DailyReportPage 加"AI 拆解"按钮
+- 拆解结果 → 写入对应业务表
+- 一键生成当天的安全施工日志 Word
+- tsc + vite build 门禁通过 → commit
+
+### 暂不做（v6.0 范围外）
+- 模板编辑器修复（已知 3 个 bug）
+- 自然语言录入 UI（用微信输入法解决）
+- 复杂排版/打印
+- 多用户协作
+
+### 禁止重写（v6.0 期间）
+- docxtemplater / ExcelJS / Dexie.js / shadcn/ui / MiniSearch / mammoth / pdfjs-dist / **tesseract.js**
+- 不动 src/pages/templates/（3 个 bug 还没修）
+- 不动 v5.0 已完成的 4 个模块（分词 / AI 调用 / 切分 / 检索）
+
 ## ⚠️ 溜哥新建 Code 任务时的操作清单（每次必读）
 
 新建 Code 任务时，必须确认以下 3 项，否则 Git 会丢：
