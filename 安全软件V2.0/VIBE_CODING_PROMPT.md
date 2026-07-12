@@ -2,6 +2,7 @@
 
 > 基于 [vibe-coding-cn](https://github.com/tradecatlabs/vibe-coding-cn) 核心架构与设计哲学生成。
 > 使用方式：将本文件作为 AI 编码会话的系统提示词或项目规则文件（`.cursor/rules`、`CLAUDE.md`、`AGENTS.md`）。
+> 当前规范：`PROJECT-SPEC-v5.md`（v5.0 MVP 切入口，安全施工日志）。历史 v4.1.3 规范保留对照。
 
 ---
 

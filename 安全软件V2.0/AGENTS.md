@@ -52,14 +52,15 @@
 
 ## 启动指令（AI 必须执行）
 
-打开本会话后，**立即**读取以下两个文件以获取完整上下文：
+打开本会话后，**立即**读取以下三个文件以获取完整上下文：
 
-1. `PROJECT-new_SPEC.md` — 产品需求、功能定义、技术方案（权威规范）
+1. `PROJECT-SPEC-v5.md` — **当前规范**（v5.0 MVP 切入口，以安全施工日志为引爆点）
 2. `VIBE_CODING_PROMPT.md` — 编码规范、拼好码原则、质量门禁（工作手册）
+3. `PROJECT-new_SPEC.md` — 历史 v4.1.3 全功能规范（仅用于对照，不作为开发依据）
 
 ## 一句话定位
 
-溜哥（大理机场改扩建项目安全总监）的安全管理桌面应用。Electron + React 18 + TypeScript 5 + Tailwind 3 + shadcn/ui。独立 exe，不依赖 WPS。
+溜哥（大理机场改扩建项目安全总监）的安全管理桌面应用。Electron + React 18 + TypeScript 5 + Tailwind 3 + shadcn/ui。独立 exe，不依赖 WPS。**v5.0 聚焦安全施工日志 MVP，不做功能蔓延。**
 
 ## 核心铁律（拼好码）
 
