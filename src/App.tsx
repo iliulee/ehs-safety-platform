@@ -5,6 +5,8 @@ import HomePage from '@/pages/home/HomePage'
 import ProjectListPage from '@/pages/projects/ProjectListPage'
 import SubcontractorListPage from '@/pages/subcontractors/SubcontractorListPage'
 import WorkerListPage from '@/pages/workers/WorkerListPage'
+import WorkerEditPage from '@/pages/workers/WorkerEditPage'
+import WorkerDetailPage from '@/pages/workers/WorkerDetailPage'
 import EducationListPage from '@/pages/education/EducationListPage'
 import TrainingListPage from '@/pages/training/TrainingListPage'
 import LogListPage from '@/pages/dailylog/LogListPage'
@@ -26,8 +28,10 @@ import XlsxEditorPage from '@/pages/editor/XlsxEditorPage'
 import DailyReportPage from '@/pages/report/DailyReportPage'
 import SettingsPage from '@/pages/settings/SettingsPage'
 import VariableSettingsPage from '@/pages/settings/VariableSettingsPage'
+import DataMigrationPage from '@/pages/settings/DataMigrationPage'
 // 新模块
 import EquipmentPage from '@/pages/equipment/EquipmentPage'
+import EquipmentEditPage from '@/pages/equipment/EquipmentEditPage'
 import PpePage from '@/pages/ppe/PpePage'
 import EmergencyPage from '@/pages/emergency/EmergencyPage'
 import AccidentPage from '@/pages/accident/AccidentPage'
@@ -47,7 +51,12 @@ export default function App() {
         <Route path="/projects" element={<FeatureRoute flag={featureFlags.projectManagement}><ProjectListPage /></FeatureRoute>} />
         <Route path="/subcontractors" element={<FeatureRoute flag={featureFlags.subcontractorManagement}><SubcontractorListPage /></FeatureRoute>} />
         <Route path="/workers" element={<FeatureRoute flag={featureFlags.workerManagement}><WorkerListPage /></FeatureRoute>} />
+        <Route path="/workers/new" element={<FeatureRoute flag={featureFlags.workerManagement}><WorkerEditPage /></FeatureRoute>} />
+        <Route path="/workers/:id" element={<FeatureRoute flag={featureFlags.workerManagement}><WorkerDetailPage /></FeatureRoute>} />
+        <Route path="/workers/:id/edit" element={<FeatureRoute flag={featureFlags.workerManagement}><WorkerEditPage /></FeatureRoute>} />
         <Route path="/equipment" element={<FeatureRoute flag={featureFlags.equipmentManagement}><EquipmentPage /></FeatureRoute>} />
+        <Route path="/equipment/new" element={<FeatureRoute flag={featureFlags.equipmentManagement}><EquipmentEditPage /></FeatureRoute>} />
+        <Route path="/equipment/:id/edit" element={<FeatureRoute flag={featureFlags.equipmentManagement}><EquipmentEditPage /></FeatureRoute>} />
         {/* 安全过程 */}
         <Route path="/education" element={<FeatureRoute flag={featureFlags.educationManagement}><EducationListPage /></FeatureRoute>} />
         <Route path="/training" element={<FeatureRoute flag={featureFlags.trainingManagement}><TrainingListPage /></FeatureRoute>} />
@@ -81,6 +90,7 @@ export default function App() {
         {/* 系统 */}
         <Route path="/settings" element={<FeatureRoute flag={featureFlags.settings}><SettingsPage /></FeatureRoute>} />
         <Route path="/settings/variables" element={<FeatureRoute flag={featureFlags.variableSettings}><VariableSettingsPage /></FeatureRoute>} />
+        <Route path="/settings/migration" element={<FeatureRoute flag={featureFlags.settings}><DataMigrationPage /></FeatureRoute>} />
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Route>
     </Routes>
