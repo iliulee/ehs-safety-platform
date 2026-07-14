@@ -13,6 +13,9 @@ import type {
   SubcontractorStatus,
   AiRole,
   DictCategory,
+  TrainingType,
+  TrainingScene,
+  AttachmentCategory,
 } from './enums'
 
 export interface BaseEntity {
@@ -552,9 +555,17 @@ export interface Equipment extends BaseEntity {
   inspectionDate?: string   // 上次检验日期
   nextInspectionDate?: string // 下次检验日期
   operatorId?: string       // 操作人员ID
+  insuranceCompany?: string // 保险公司
+  insuranceType?: string    // 交强险、商业险等
+  insuranceExpiryDate?: string // 保险到期日
   status: '在用' | '停用' | '已退场' | '待检验'
   projectId?: string
   remark?: string
+  // v5.0 Day 2 收尾新增字段（铭牌识别常用，规格 §3.6 Equipment 字段补全）
+  code?: string             // 设备编号/车牌（铭牌上的"设备编号"或"出厂编号"独立字段）
+  manufacturer?: string     // 制造商
+  manufactureLicense?: string // 制造许可证号（如 TS 2410383-2022）
+  ratedTorque?: string      // 额定起重力矩（塔吊关键参数，如 800 kN·m）
 }
 
 /** 应急管理 — 应急预案 */
@@ -630,4 +641,82 @@ export interface AccidentRecord extends BaseEntity {
   responsiblePersonId?: string
   projectId?: string
   attachments?: Attachment[]
+}
+
+// ===== v5.0.1 EHS "人-事-证" 表结构重构 =====
+// 替换旧的 EducationRecord + TrainingRecord，统一为：
+//   TrainingSession（"事"主表）+ TrainingEnrollment（"人-事关联"）+ AttachmentRecord（"痕迹"）
+// 旧表保留兼容（不删），新数据写入新表；旧数据通过迁移函数迁到新表
+
+/**
+ * 培训/教育会话（统一的"事"主表）
+ * 一场安全教育、一次技术交底、一次班前教育、一次体检，都是一条 TrainingSession
+ */
+export interface TrainingSession extends BaseEntity {
+  title: string                   // 标题
+  type: TrainingType              // 类型：安全教育/技术交底/会议/技能培训/体检/班前
+  scene: TrainingScene            // 场景：三级教育(公司/项目/班组)/技术交底/月度/临时/班前
+  date: string                    // 日期 YYYY-MM-DD
+  duration?: number               // 时长（分钟）
+  educator?: string               // 教育/主讲人
+  location?: string               // 地点
+  content?: string                // 内容摘要
+  materials?: string[]            // 培训材料 URL 列表
+  projectId?: string              // 所属项目
+  status: 'planned' | 'ongoing' | 'completed' | 'cancelled'
+}
+
+/**
+ * 培训/教育报名记录（"人-事关联"表）
+ * 一个工人参加一场培训 = 一条 TrainingEnrollment
+ * 一人一次教育一条记录，签字时间戳必填（未签字视为未完成）
+ */
+export interface TrainingEnrollment extends BaseEntity {
+  trainingId: string              // 关联 TrainingSession.id
+  workerId: string                // 工人 ID
+  /** 冗余字段：工人身份证号（用于跨项目查询/退场后档案可查） */
+  workerIdCard?: string
+  /** 冗余字段：工人姓名（用于不依赖 worker 表的展示） */
+  workerName: string
+  /** 冗余字段：场景（便于不联表直接按场景统计） */
+  scene: TrainingScene
+  /** 报名时间戳 */
+  enrolledAt: number
+  /** 签字时间戳（必填，未签字视为未完成） */
+  signedAt?: number
+  /** 签字照片附件 ID（关联 AttachmentRecord.id） */
+  signatureBlobId?: string
+  /** 考试分数（如有） */
+  examScore?: number
+  /** 考试结果 */
+  examResult?: 'pass' | 'fail' | 'pending' | 'exempt'
+  /** 免考原因（如持证免考） */
+  exemptReason?: string
+}
+
+/**
+ * 附件记录（统一的"痕迹"表）
+ * 取代散落在各表 attachments[] 字段中的零散附件，提供统一的过期管理和分类查询
+ */
+export interface AttachmentRecord extends BaseEntity {
+  /** 关联实体类型：worker/training/certificate/equipment/hazard/acceptance 等 */
+  entityType: string
+  /** 关联实体 ID */
+  entityId: string
+  /** 附件分类 */
+  category: AttachmentCategory
+  /** 附件二进制内容（Base64 编码，用于身份证照片/签字等小文件） */
+  blob?: string
+  /** 文件名 */
+  filename: string
+  /** MIME 类型 */
+  mimeType: string
+  /** 文件大小（字节） */
+  size: number
+  /** 过期日期（如证书、体检报告等有时效性的附件） */
+  expiryDate?: string
+  /** 上传人 */
+  uploadedBy?: string
+  /** 上传时间戳 */
+  uploadedAt: number
 }

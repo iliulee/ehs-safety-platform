@@ -32,6 +32,9 @@ import type {
   AccidentRecord,
   SafetyCost,
   Penalty,
+  TrainingSession,
+  TrainingEnrollment,
+  AttachmentRecord,
 } from '@/types'
 
 export class ZhianDB extends Dexie {
@@ -69,6 +72,10 @@ export class ZhianDB extends Dexie {
   safetyCosts!: Table<SafetyCost, string>
   // v4.1.0 处罚记录表
   penalties!: Table<Penalty, string>
+  // v5.0.1 EHS "人-事-证" 重构表
+  trainingSessions!: Table<TrainingSession, string>
+  trainingEnrollments!: Table<TrainingEnrollment, string>
+  attachmentRecords!: Table<AttachmentRecord, string>
 
   constructor() {
     super('liuge_safety')
@@ -133,6 +140,23 @@ export class ZhianDB extends Dexie {
     // v4.1.0 新增处罚记录表，扩展日报 items 字段（可选，无需重建索引）
     this.version(7).stores({
       penalties: '&id, date, projectId, status, createdAt',
+    })
+
+    // v5.0 Day 2 收尾：Equipment 新增 code/manufacturer/manufactureLicense/ratedTorque 4 个字段
+    // 新增 code 索引用于按设备编号查询；其他 3 个字段无独立查询需求，不加索引
+    this.version(8).stores({
+      equipment: '&id, name, category, status, projectId, entryDate, code, createdAt',
+    })
+
+    // v5.0.1 EHS "人-事-证" 重构：新建 3 张表
+    // trainingSessions: 培训/教育会话主表
+    // trainingEnrollments: 人-事关联（含签字时间戳、考试结果）
+    // attachmentRecords: 统一附件表（含过期管理）
+    // 迁移：旧 EducationRecord + TrainingRecord 数据 → 新表（迁移函数在 services/db-migrate.ts）
+    this.version(9).stores({
+      trainingSessions: '&id, type, scene, date, projectId, status, createdAt',
+      trainingEnrollments: '&id, trainingId, workerId, scene, enrolledAt, signedAt, [trainingId+workerId], createdAt',
+      attachmentRecords: '&id, entityType, entityId, category, expiryDate, uploadedAt, [entityType+entityId], [entityType+category]',
     })
   }
 }
