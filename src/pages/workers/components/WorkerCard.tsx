@@ -1,4 +1,4 @@
-import { ChevronRight, CreditCard, Phone, User as UserIcon } from 'lucide-react'
+﻿import { ChevronRight, CreditCard, Phone, User as UserIcon, Edit3, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { Worker } from '@/types'
@@ -20,7 +20,9 @@ interface WorkerCardProps {
   workTypeLabel: string
   subcontractorName: string
   onClick: () => void
+  onEdit?: () => void
   onLeave: () => void
+  onReactivate?: () => void
   onDelete: () => void
 }
 
@@ -29,7 +31,9 @@ export function WorkerCard({
   workTypeLabel,
   subcontractorName,
   onClick,
+  onEdit,
   onLeave,
+  onReactivate,
   onDelete,
 }: WorkerCardProps) {
   const st = STATUS_MAP[worker.status] ?? STATUS_MAP.active
@@ -72,19 +76,35 @@ export function WorkerCard({
             {worker.status === 'active' && (
               <button
                 onClick={(e) => handleAction(e, onLeave)}
+                title="标记离场"
                 className="h-7 px-2 rounded-md bg-amber-50 flex items-center gap-1 text-amber-700 hover:bg-amber-100 text-[10px] font-medium transition-colors"
               >
                 离场
               </button>
             )}
-            {worker.status === 'left' && (
+            {(worker.status === 'left' || worker.status === 'suspended') && onReactivate && (
               <button
-                onClick={(e) => handleAction(e, onDelete)}
-                className="h-7 px-2 rounded-md bg-red-50 flex items-center gap-1 text-red-700 hover:bg-red-100 text-[10px] font-medium transition-colors"
+                onClick={(e) => handleAction(e, onReactivate)}
+                title="恢复在岗"
+                className="h-7 px-2 rounded-md bg-emerald-50 flex items-center gap-1 text-emerald-700 hover:bg-emerald-100 text-[10px] font-medium transition-colors"
               >
-                删除
+                复工
               </button>
             )}
+            <button
+              onClick={(e) => handleAction(e, () => onEdit?.())}
+              title="修改"
+              className="h-7 w-7 rounded-md bg-blue-50 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition-colors"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => handleAction(e, onDelete)}
+              title="删除"
+              className="h-7 w-7 rounded-md bg-red-50 flex items-center justify-center text-red-600 hover:bg-red-100 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
             <ChevronRight className="w-4 h-4 text-gray-300" />
           </div>
         </div>

@@ -12,6 +12,7 @@ export default defineConfig({
     },
   },
   resolve: {
+    mainFields: ['module', 'jsnext:main', 'jsnext', 'main'],
     alias: {
       '@': path.resolve(__dirname, './src'),
       'exceljs': path.resolve(__dirname, 'node_modules/exceljs/dist/exceljs.min.js'),
@@ -19,10 +20,16 @@ export default defineConfig({
         __dirname,
         'node_modules/jieba-wasm/pkg/web/jieba_rs_wasm_bg.wasm',
       ),
+      'jieba-wasm': path.resolve(__dirname, './src/stubs/jieba-wasm-stub.ts'),
+      '@node-rs/jieba': path.resolve(__dirname, './src/stubs/jieba-stub.ts'),
+      '@node-rs/jieba-wasm32-wasi': path.resolve(__dirname, './src/stubs/jieba-wasm-stub.ts'),
     },
   },
   define: {
     'process.env': {},
+  },
+  optimizeDeps: {
+    exclude: ['@node-rs/jieba'],
   },
   build: {
     outDir: 'dist',

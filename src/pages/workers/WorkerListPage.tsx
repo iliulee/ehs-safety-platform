@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import { useWorkerList, type StatusFilter } from './hooks/useWorkerList'
 import { WorkerToolbar } from './components/WorkerToolbar'
 import { WorkerList } from './components/WorkerList'
-import { WorkerSheets } from './components/WorkerSheets'
 import { workerService } from '@/services/workerService'
 import type { Worker } from '@/types'
 
 export default function WorkerListPage() {
+  const navigate = useNavigate()
   const { getDictItems } = useAppStore()
   const workTypeItems = getDictItems('work_type')
 
@@ -22,9 +23,6 @@ export default function WorkerListPage() {
     searchText,
     setSearchText,
   } = useWorkerList()
-
-  const [addOpen, setAddOpen] = useState(false)
-  const [editWorker, setEditWorker] = useState<Worker | null>(null)
 
   const subcontractorMap = useMemo(
     () => new Map(subcontractors.map((s) => [s.id!, s.name])),
@@ -46,13 +44,23 @@ export default function WorkerListPage() {
     await workerService.remove(worker.id)
   }
 
+  const handleReactivate = async (worker: Worker) => {
+    if (!worker.id || !confirm('确定将该工人恢复在岗？')) return
+    await workerService.update(worker.id, { status: 'active' })
+  }
+
+  const handleEdit = (worker: Worker) => {
+    if (!worker.id) return
+    navigate(`/workers/${worker.id}/edit`)
+  }
+
   return (
     <div className="pb-6">
       <WorkerToolbar
         count={workers.length}
         searchText={searchText}
         onSearchChange={setSearchText}
-        onAdd={() => setAddOpen(true)}
+        onAdd={() => navigate('/workers/new')}
       />
 
       <div className="px-3 pt-3">
@@ -64,20 +72,13 @@ export default function WorkerListPage() {
           subcontractorMap={subcontractorMap}
           workTypeMap={workTypeMap}
           onStatusChange={(s) => setStatusFilter(s as StatusFilter)}
-          onDetail={setEditWorker}
+          onDetail={(w) => navigate(`/workers/${w.id}`)}
+          onEdit={handleEdit}
           onLeave={handleLeave}
+          onReactivate={handleReactivate}
           onDelete={handleDelete}
         />
       </div>
-
-      <WorkerSheets
-        addOpen={addOpen}
-        setAddOpen={setAddOpen}
-        editWorker={editWorker}
-        setEditWorker={setEditWorker}
-        workTypeItems={workTypeItems}
-        subcontractors={subcontractors}
-      />
     </div>
   )
 }

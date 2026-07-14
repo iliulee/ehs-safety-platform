@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+﻿import OpenAI from 'openai'
 import { db, generateId, now } from '@/db'
 import type { AiChatMessage, AiSession } from '@/types'
 
@@ -49,6 +49,7 @@ class AiService {
       baseURL: settings.baseUrl,
       apiKey: settings.apiKey,
       dangerouslyAllowBrowser: true,
+      defaultHeaders: { 'Content-Type': 'application/json' },
     })
   }
 

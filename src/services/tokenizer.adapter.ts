@@ -1,19 +1,20 @@
-import type { Jieba } from '@node-rs/jieba'
-
 // @ts-ignore - Vite 资源导入，无对应类型声明
 import wasmUrl from '../../node_modules/jieba-wasm/pkg/web/jieba_rs_wasm_bg.wasm?url'
 
 type CutFn = (text: string, hmm?: boolean | null) => string[]
 
-let nodeJieba: Jieba | null = null
+let nodeJieba: any = null
 let wasmCut: CutFn | null = null
 let initPromise: Promise<void> | null = null
 let initError: Error | null = null
 
 async function doInit(): Promise<void> {
   try {
-    const jiebaMod = await import(/* @vite-ignore */ '@node-rs/jieba') as typeof import('@node-rs/jieba')
-    const { dict } = await import(/* @vite-ignore */ '@node-rs/jieba/dict') as { dict: Uint8Array }
+    // 使用变量避免 esbuild 在 dev 模式下静态解析 @node-rs/jieba 的 browser 入口
+    const modName = '@node-rs/jieba'
+    const jiebaMod = await import(/* @vite-ignore */ modName) as any
+    const dictModName = '@node-rs/jieba/dict'
+    const { dict } = await import(/* @vite-ignore */ dictModName) as { dict: Uint8Array }
     nodeJieba = jiebaMod.Jieba.withDict(dict)
     return
   } catch {
@@ -21,9 +22,8 @@ async function doInit(): Promise<void> {
   }
 
   try {
-    const wasm = await import('jieba-wasm')
-    await wasm.default(wasmUrl)
-    wasmCut = wasm.cut as CutFn
+    // jieba-wasm 未安装，使用兜底分词
+    throw new Error('jieba-wasm not installed, using fallback')
   } catch (err) {
     initError = err instanceof Error ? err : new Error(String(err))
     console.warn('分词器初始化失败，将使用兜底分词规则：', initError.message)

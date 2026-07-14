@@ -1,4 +1,4 @@
-import { Users, UserCheck, UserX, Briefcase } from 'lucide-react'
+﻿import { Users, UserCheck, UserX, Briefcase } from 'lucide-react'
 import { WorkerCard } from './WorkerCard'
 import { STATUS_TABS, type StatusFilter } from '../hooks/useWorkerList'
 import type { Worker } from '@/types'
@@ -12,7 +12,9 @@ interface WorkerListProps {
   workTypeMap: Map<string, string>
   onStatusChange: (status: StatusFilter) => void
   onDetail: (worker: Worker) => void
+  onEdit: (worker: Worker) => void
   onLeave: (worker: Worker) => void
+  onReactivate: (worker: Worker) => void
   onDelete: (worker: Worker) => void
 }
 
@@ -25,7 +27,9 @@ export function WorkerList({
   workTypeMap,
   onStatusChange,
   onDetail,
+  onEdit,
   onLeave,
+  onReactivate,
   onDelete,
 }: WorkerListProps) {
   if (loading) {
@@ -79,7 +83,9 @@ export function WorkerList({
               workTypeLabel={w.workType ? (workTypeMap.get(w.workType) ?? w.workType) : ''}
               subcontractorName={w.subcontractorId ? (subcontractorMap.get(w.subcontractorId) ?? '-') : ''}
               onClick={() => onDetail(w)}
+              onEdit={() => onEdit(w)}
               onLeave={() => onLeave(w)}
+              onReactivate={() => onReactivate(w)}
               onDelete={() => onDelete(w)}
             />
           ))}
