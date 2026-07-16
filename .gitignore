@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 dist/
 dist-electron/
 .env
@@ -6,3 +6,17 @@ dist-electron/
 *.log
 .DS_Store
 Thumbs.db
+
+# 归档（测试/开发垃圾，不上传）
+_archive/
+screenshots/
+scripts/
+test-*.py
+test-*.png
+test-files/
+test-screenshots/
+.trae/
+backup/
+.uploads/
+data/
+一分公司内业资料/
