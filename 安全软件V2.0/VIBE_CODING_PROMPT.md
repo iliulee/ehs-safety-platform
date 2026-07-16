@@ -65,6 +65,7 @@
 | 图表 | Chart.js + react-chartjs-2 | ❌ 自研可视化 |
 | PDF解析 | pdfjs-dist | ❌ 自研PDF提取 |
 | Word解析 | mammoth | ❌ 自研docx提取 |
+| OCR | tesseract.js v7 | ❌ 自研OCR/自建识别模型 |
 
 ### 胶水代码应该做什么
 
@@ -89,7 +90,7 @@
 
 ```
 1. 明确目标
-   → 读 PROJECT-new_SPEC.md 对应章节
+   → 读 PROJECT-SPEC-v5.md 对应章节
    → 确认输入是什么、输出是什么、验收标准是什么
 
 2. 探索上下文
@@ -134,6 +135,24 @@ npx vite build            # 构建 → 必须通过（实际执行 tsc -b && vit
 npx playwright test       # 截图验证 → 页面无错乱
 ```
 
+### 测试策略（v5.0 最低要求）
+
+每个新建 service 必须包含单元测试，文件放在 `src/services/__tests__/`：
+
+- 正向用例：至少 3 个（正常输入 → 预期输出）
+- 异常用例：至少 2 个（错误输入 → 预期降级）
+- 边界用例：空输入、超长输入、特殊字符
+
+```bash
+# 运行测试
+npx vitest run src/services/__tests__/
+```
+
+测试覆盖要求（仅 v5.0 新建文件）：
+- `ocr.service.ts`：身份证识别、铭牌识别、低置信度降级
+- `ai-parser.service.ts`：正常拆解、zod 校验失败、超时降级
+- `worker-matcher.service.ts`：精确匹配、未匹配降级、重名处理
+
 ---
 
 ## 四、器（工具）—— 项目技术栈速查
@@ -153,8 +172,8 @@ npx playwright test       # 截图验证 → 页面无错乱
 | 图表 | Chart.js 4 + react-chartjs-2 5 | ✅ 已安装 |
 | Word | docxtemplater 3 + pizzip 3 | ✅ 已安装 |
 | Excel | ExcelJS 4 | ✅ 已安装 |
-| Word编辑 | @eigenpal/docx-editor-react | ✅ 已安装 |
-| Excel编辑 | @univerjs/sheets + @univerjs/ui | ✅ 已安装 |
+| Word编辑 | @eigenpal/docx-editor-react | ⚠️ 已降级（v5.0 仅预览，不编辑） |
+| Excel编辑 | @univerjs/sheets + @univerjs/ui | ⚠️ 已降级（v5.0 仅预览，不编辑） |
 | 检索 | MiniSearch 7 | ✅ 已安装 | — |
 | AI | openai (OpenAI Node SDK) 4 | ✅ 已安装 | — |
 | 切分 | @langchain/textsplitters | ✅ 已安装 | — |
@@ -166,19 +185,17 @@ npx playwright test       # 截图验证 → 页面无错乱
 src/
 ├── services/          ← 胶水代码层（业务逻辑、流程编排、适配层）
 │   ├── ai.service.ts
-│   ├── rag-knowledge.service.ts
 │   ├── mini-search.adapter.ts    ← MiniSearch适配层
 │   ├── chunker.adapter.ts        ← LangChain适配层
 │   ├── tokenizer.adapter.ts      ← 结巴分词适配层
 │   ├── generate.service.ts       ← 文档生成
-│   ├── ledger.service.ts         ← 台账生成
 │   └── ...
 ├── pages/             ← 页面组件（每个页面一个文件夹）
 ├── components/        ← 可复用组件
 │   ├── ui/            ← shadcn/ui组件
 │   └── business/      ← 业务组件
 ├── db/                ← 数据层
-│   ├── db.ts          ← Dexie实例
+│   ├── index.ts        ← Dexie实例
 │   └── repositories/  ← 数据仓库
 ├── stores/            ← Zustand状态
 ├── hooks/             ← 自定义Hooks
@@ -257,7 +274,7 @@ src/
 当用户说"开始开发"时，你的第一反应：
 
 ```
-1. Read PROJECT-new_SPEC.md 对应章节
+1. Read PROJECT-SPEC-v5.md 对应章节
 2. Read 涉及的源文件
 3. TodoWrite 列出步骤
 4. 逐步执行，每步验证

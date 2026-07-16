@@ -188,9 +188,13 @@ function extractVariablesFromXlsx(zip: PizZip, vars: Set<string>): void {
 
 function addCleanVar(raw: string, vars: Set<string>): void {
   const name = raw.trim().replace(/^[#/%]/, '').split('|')[0].trim()
-  if (name && !name.includes(' ') && !name.includes('/')) {
-    vars.add(name)
-  }
+  // 过滤无效变量名：空、含空格、含斜杠、纯数字、Word XML 命名空间前缀
+  if (!name) return
+  if (name.includes(' ') || name.includes('/')) return
+  if (/^\d+$/.test(name)) return
+  // 过滤 Word XML 元素名：w:、r:、v:、o:、mc:、wp:、a: 等命名空间前缀
+  if (/^[a-z]+:/i.test(name)) return
+  vars.add(name)
 }
 
 async function inferMapping(name: string): Promise<VariableMapping> {
@@ -238,20 +242,11 @@ async function inferMapping(name: string): Promise<VariableMapping> {
 // 知识库分类与模板分类名称映射：扫描文件夹时，PDF/txt/md 进入知识库同名分类
 const KNOWLEDGE_CATEGORY_FALLBACK = 'custom'
 
-async function defaultCategory(): Promise<{ id: string; name: string }> {
-  return ensureRootUncategorized()
-}
-
 async function ensureRootCategory(name: string): Promise<string> {
   const all = await categoryRepo.getAll()
   const existing = all.find((c) => c.parentId === null && c.name === name)
   if (existing) return existing.id!
   return categoryRepo.createCustom(name, null)
-}
-
-async function ensureRootUncategorized(): Promise<{ id: string; name: string }> {
-  const id = await ensureRootCategory('未分类')
-  return { id, name: '未分类' }
 }
 
 async function ensureSubCategory(parentId: string, name: string): Promise<string> {
@@ -263,23 +258,23 @@ async function ensureSubCategory(parentId: string, name: string): Promise<string
 
 /**
  * 根据本地文件夹路径解析模板分类。
- * 扫描模式下，用文件夹第一级作为根分类，后续层级作为子分类，保留原文件夹层级。
+ * 空路径表示不设分类（categoryId 为空，后续在 UI 中归入"未分类"虚拟筛选项）。
+ * 扫描模式下只取第一级文件夹作为分类（扁平结构，与 UI 分类树一致）。
  */
 async function resolveCategory(
   path: string[],
   scanMode: boolean,
 ): Promise<{ id: string; name: string }> {
   if (path.length === 0) {
-    return scanMode ? ensureRootUncategorized() : defaultCategory()
+    // 无路径 → 不设分类，categoryId 为空
+    return { id: '', name: '' }
   }
 
   if (scanMode) {
-    let currentId = await ensureRootCategory(path[0])
-    for (let i = 1; i < path.length; i++) {
-      currentId = await ensureSubCategory(currentId, path[i])
-    }
-    const final = await categoryRepo.getById(currentId)
-    return { id: currentId, name: final?.name ?? path[path.length - 1] }
+    // 扫描模式：只取第一级作为分类，扁平化
+    const id = await ensureRootCategory(path[0])
+    const final = await categoryRepo.getById(id)
+    return { id, name: final?.name ?? path[0] }
   }
 
   const first = path[0]
@@ -293,7 +288,7 @@ async function resolveCategory(
     const all = await categoryRepo.getAll()
     parent = all.find((c) => first.includes(c.name) || c.name.includes(first))
   }
-  if (!parent) return defaultCategory()
+  if (!parent) return { id: '', name: '' }
 
   let currentId = parent.id!
   for (let i = 1; i < path.length; i++) {
@@ -483,7 +478,9 @@ export const templateImportService = {
       .filter((f) => isScannableFile(f.name))
       .map((f) => {
         const parts = (f.webkitRelativePath ?? f.name).split('/')
-        return { file: f, path: parts.slice(1, -1) }
+        // webkitRelativePath 格式为 "选中文件夹/子文件夹/.../文件名"
+        // slice(0, -1) 去掉文件名，保留所有文件夹层级
+        return { file: f, path: parts.slice(0, -1) }
       })
     if (files.length === 0) return { items: [], failed: [] }
     return buildPreviewBatch(files, onProgress, true)

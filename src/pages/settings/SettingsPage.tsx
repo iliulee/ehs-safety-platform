@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Settings as SettingsIcon, Download, Upload,
   Info, Shield, ChevronRight, CheckCircle, AlertCircle, Trash2,
-  Braces, Key, Bot,
+  Braces, Key, Bot, Database,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -228,6 +228,24 @@ export default function SettingsPage() {
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-800">变量设置</p>
                   <p className="text-xs text-gray-500">管理模板变量与项目字段映射</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-300" />
+              </button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-0">
+              <button
+                onClick={() => navigate('/settings/migration')}
+                className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Database className="w-4 h-4" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800">数据迁移（v5.0.1）</p>
+                  <p className="text-xs text-gray-500">把旧教育/培训记录迁到新表结构</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-300" />
               </button>

@@ -1,6 +1,6 @@
 import { db, generateId, now } from '@/db'
 import type { KnowledgeDocument, KnowledgeChunk, RetrievalHit, ChunkProgress } from '@/types'
-import { tokenize, BM25Searcher } from './bm25.service'
+import { tokenize, MiniSearchIndex } from './mini-search.adapter'
 import { ensureTokenizer } from './tokenizer.adapter'
 import { chunkText } from './chunker.service'
 import { extractTextFromFile } from './text-extractor.service'
@@ -267,7 +267,7 @@ TN-S接零保护系统要求：电气设备的金属外壳必须与保护零线�
 ]
 
 class RagKnowledgeService {
-  private searcher: BM25Searcher | null = null
+  private searcher: MiniSearchIndex | null = null
   private chunkCache: Map<string, KnowledgeChunk> = new Map()
   private initPromise: Promise<void> | null = null
 
@@ -294,7 +294,7 @@ class RagKnowledgeService {
         .first()
       if (existing) continue
 
-      const chunks = chunkText(doc.content, doc.title)
+      const chunks = await chunkText(doc.content, doc.title)
       const docId = generateId()
       const ts = now()
 
@@ -336,11 +336,11 @@ class RagKnowledgeService {
   }
 
   private async rebuildIndex(): Promise<void> {
-    this.searcher = new BM25Searcher()
+    this.searcher = new MiniSearchIndex()
     this.chunkCache.clear()
     const allChunks = await db.knowledgeChunks.toArray()
     for (const chunk of allChunks) {
-      this.searcher.addDoc(chunk.id!, chunk.tokens)
+      this.searcher.addDoc(chunk.id!, chunk.content, chunk.docTitle)
       this.chunkCache.set(chunk.id!, chunk)
     }
   }
@@ -388,7 +388,7 @@ class RagKnowledgeService {
     }
 
     onProgress?.({ phase: 'chunking', processed: 50, total: 100, currentFile: file.name })
-    const chunks = chunkText(fullText, title)
+    const chunks = await chunkText(fullText, title)
 
     onProgress?.({ phase: 'tokenizing', processed: 70, total: 100, currentFile: file.name })
 
@@ -434,7 +434,7 @@ class RagKnowledgeService {
 
     if (this.searcher) {
       for (const chunk of chunkRecords) {
-        this.searcher.addDoc(chunk.id!, chunk.tokens)
+        this.searcher.addDoc(chunk.id!, chunk.content, chunk.docTitle)
         this.chunkCache.set(chunk.id!, chunk)
       }
     }
@@ -511,10 +511,7 @@ class RagKnowledgeService {
     await this.ensureInitialized()
     if (!this.searcher) return []
 
-    const queryTokens = tokenize(query)
-    if (queryTokens.length === 0) return []
-
-    const searchResults = this.searcher.search(queryTokens, topK * 2)
+    const searchResults = this.searcher.search(query, topK * 2)
     const hits: RetrievalHit[] = []
     const seenDocs = new Set<string>()
 

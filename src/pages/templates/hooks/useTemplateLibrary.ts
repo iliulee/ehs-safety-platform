@@ -1,13 +1,17 @@
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { templateRepo } from '@/db/repositories/template.repo'
-import { categoryRepo, type CategoryNode } from '@/db/repositories/category.repo'
+import { categoryRepo } from '@/db/repositories/category.repo'
+import type { CategoryRecord } from '@/types'
+
+/** 虚拟"未分类"筛选项的 ID，不对应数据库中的真实分类 */
+export const UNCATEGORIZED_ID = '__uncategorized__'
 
 export function useTemplateLibrary() {
   const [keyword, setKeyword] = useState('')
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [activeCategoryName, setActiveCategoryName] = useState('全部模板')
-  const [categoryTree, setCategoryTree] = useState<CategoryNode[]>([])
+  const [categories, setCategories] = useState<CategoryRecord[]>([])
 
   const templates = useLiveQuery(
     () => templateRepo.table.orderBy('createdAt').reverse().toArray(),
@@ -15,14 +19,17 @@ export function useTemplateLibrary() {
     [],
   )
 
-  // 初始加载分类树
+  // 初始加载分类列表（扁平，无子分类），过滤掉数据库中名为"未分类"的真实分类
   useEffect(() => {
-    categoryRepo.getTree().then(setCategoryTree)
+    categoryRepo.getChildren(null).then((all) => {
+      setCategories(all.filter((c) => c.name !== '未分类'))
+    })
   }, [])
 
-  // 直接调用 getTree + setCategoryTree，消除 treeVersion → useEffect 两跳异步链路
   const refreshTree = useCallback(() => {
-    categoryRepo.getTree().then(setCategoryTree)
+    categoryRepo.getChildren(null).then((all) => {
+      setCategories(all.filter((c) => c.name !== '未分类'))
+    })
   }, [])
 
   // 从 liveQuery 的 templates 数据计算每个分类的模板数量
@@ -36,33 +43,25 @@ export function useTemplateLibrary() {
     return counts
   }, [templates])
 
-  const descendantIdMap = useMemo(() => {
-    const map = new Map<string, Set<string>>()
-    const walk = (node: CategoryNode) => {
-      const ids = new Set<string>([node.id!])
-      for (const child of node.children) {
-        walk(child)
-        ids.add(child.id!)
-        const childIds = map.get(child.id!)
-        if (childIds) {
-          childIds.forEach((id) => ids.add(id))
-        }
-      }
-      map.set(node.id!, ids)
-    }
-    for (const root of categoryTree) walk(root)
-    return map
-  }, [categoryTree])
+  // 未分类模板数量（categoryId 为空）
+  const uncategorizedCount = useMemo(
+    () => templates.filter((t) => !t.categoryId).length,
+    [templates],
+  )
 
   const filtered = useMemo(() => {
-    const allowedIds = activeCategoryId
-      ? (descendantIdMap.get(activeCategoryId) ?? new Set([activeCategoryId]))
-      : null
     const kw = keyword.trim()
     return templates.filter((t) => {
-      const matchCat =
-        activeCategoryId === null ||
-        (t.categoryId && allowedIds?.has(t.categoryId))
+      let matchCat: boolean
+      if (activeCategoryId === null) {
+        // "全部模板"：显示所有
+        matchCat = true
+      } else if (activeCategoryId === UNCATEGORIZED_ID) {
+        // "未分类"：只显示 categoryId 为空的模板
+        matchCat = !t.categoryId
+      } else {
+        matchCat = t.categoryId === activeCategoryId
+      }
       const matchKw =
         !kw ||
         t.name.includes(kw) ||
@@ -70,7 +69,7 @@ export function useTemplateLibrary() {
         (t.variables?.some((v) => v.includes(kw)) ?? false)
       return matchCat && matchKw
     })
-  }, [templates, activeCategoryId, keyword, descendantIdMap])
+  }, [templates, activeCategoryId, keyword])
 
   const handleCategorySelect = (id: string | null, name: string) => {
     setActiveCategoryId(id)
@@ -79,8 +78,9 @@ export function useTemplateLibrary() {
 
   return {
     templates,
-    categoryTree,
+    categories,
     templateCounts,
+    uncategorizedCount,
     refreshTree,
     filtered,
     keyword,

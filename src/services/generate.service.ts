@@ -20,6 +20,7 @@ export interface RenderResult {
   fileName: string
   manualVariables: VariableMapping[]
   missingRequired: string[]
+  residualVariables?: string[]
 }
 
 function formatDate(
@@ -90,14 +91,25 @@ async function resolveValue(
   switch (mapping.source) {
     case 'field': {
       const project = await getProject(ctx)
-      if (!project) return ''
+      if (!project) {
+        console.warn(`[generate] field 变量 "${mapping.name}" 解析失败：未找到项目数据`)
+        return ''
+      }
       // 兼容旧数据：source 为 field 但用 extraFieldKey 映射扩展字段
       if (mapping.extraFieldKey) {
         const extra = (project as { extraFields?: Record<string, string> }).extraFields ?? {}
         return extra[mapping.extraFieldKey] ?? ''
       }
-      if (!mapping.table || !mapping.field) return ''
-      if (mapping.table !== 'projects') return ''
+      if (!mapping.field) {
+        console.warn(`[generate] field 变量 "${mapping.name}" 缺少 field 字段`)
+        return ''
+      }
+      // 兼容旧数据：没有 table 字段的映射，视为 projects 表
+      // 放宽判断：table 为 undefined/null/'projects'/'project' 都允许通过
+      if (mapping.table && !['projects', 'project'].includes(mapping.table)) {
+        console.warn(`[generate] field 变量 "${mapping.name}" 的 table 为 "${mapping.table}"，非 projects 表，跳过`)
+        return ''
+      }
       return resolveFieldValue(project, mapping)
     }
     case 'extraField': {
@@ -154,9 +166,74 @@ export async function renderSingle(
   const template = await templateRepo.getById(templateId)
   if (!template) throw new Error('模板不存在')
   if (!template.content) {
-    throw new Error('模板没有文件内容，请先上传或导入 Word 模板文件')
+    throw new Error('模板没有文件内容，请先上传或导入模板文件')
   }
 
+  const { manualVariables, missingRequired, data } = await buildRenderData(template, ctx)
+
+  if (manualVariables.length > 0 || missingRequired.length > 0) {
+    return {
+      blob: null,
+      fileName: template.name,
+      manualVariables,
+      missingRequired,
+    }
+  }
+
+  // 根据文件类型路由到不同的渲染引擎
+  if (template.fileType === 'xlsx') {
+    return renderXlsxSingle(template, data)
+  }
+
+  // docx（默认）
+  const zip = new PizZip(template.content, { base64: true })
+  const doc = new Docxtemplater(zip, {
+    paragraphLoop: true,
+    linebreaks: true,
+    delimiters: { start: '{{', end: '}}' },
+  } as Record<string, unknown>)
+  doc.setData(data)
+  doc.render()
+
+  // 检测文档中是否有未被替换的 {{变量名}} 残留
+  const outputZip = doc.getZip()
+  const outputText = outputZip.generate({ type: 'string' })
+  const residualRegex = /\{\{(.+?)\}\}/g
+  const residualVars = new Set<string>()
+  let resMatch: RegExpExecArray | null
+  while ((resMatch = residualRegex.exec(outputText)) !== null) {
+    residualVars.add(resMatch[1].trim())
+  }
+  if (residualVars.size > 0) {
+    console.warn('[generate] 发现未被替换的变量:', Array.from(residualVars))
+  }
+
+  const blob = outputZip.generate({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  }) as Blob
+
+  const fileName = `${template.name}_${formatDate(new Date())}.docx`
+  return {
+    blob,
+    fileName,
+    manualVariables: [],
+    missingRequired: [],
+    residualVariables: residualVars.size > 0 ? Array.from(residualVars) : undefined,
+  }
+}
+
+/**
+ * 组装渲染数据：遍历变量映射，解析值，收集手动变量和缺失必填项。
+ */
+async function buildRenderData(
+  template: { variableMappings?: VariableMapping[] },
+  ctx: RenderContext,
+): Promise<{
+  manualVariables: VariableMapping[]
+  missingRequired: string[]
+  data: Record<string, unknown>
+}> {
   const mappings = template.variableMappings ?? []
   const manualVariables: VariableMapping[] = []
   const missingRequired: string[] = []
@@ -193,30 +270,63 @@ export async function renderSingle(
     data[m.name] = value
   }
 
-  if (manualVariables.length > 0 || missingRequired.length > 0) {
-    return {
-      blob: null,
-      fileName: template.name,
-      manualVariables,
-      missingRequired,
-    }
+  return { manualVariables, missingRequired, data }
+}
+
+/**
+ * 在 XML 字符串中替换 {{变量名}} 占位符。
+ * 将值中的特殊 XML 字符转义，防止破坏 XML 结构。
+ */
+function replaceVariablesInXml(xml: string, data: Record<string, unknown>): string {
+  return xml.replace(/\{\{(.+?)\}\}/g, (_match, name: string) => {
+    const key = name.trim()
+    if (!(key in data)) return _match
+    const value = data[key]
+    if (value === undefined || value === null) return ''
+    return xmlEscape(String(value))
+  })
+}
+
+function xmlEscape(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+/**
+ * 渲染 xlsx 模板：用 JSZip 加载 → 遍历 sharedStrings 和 worksheet XML → 替换 {{变量名}} → 输出 Blob。
+ */
+async function renderXlsxSingle(
+  template: { content?: string | null; name: string },
+  data: Record<string, unknown>,
+): Promise<RenderResult> {
+  const zip = await JSZip.loadAsync(template.content!, { base64: true })
+
+  // 替换 sharedStrings.xml
+  const ssFile = zip.file('xl/sharedStrings.xml')
+  if (ssFile) {
+    const ssXml = await ssFile.async('string')
+    const replaced = replaceVariablesInXml(ssXml, data)
+    zip.file('xl/sharedStrings.xml', replaced)
   }
 
-  const zip = new PizZip(template.content, { base64: true })
-  const doc = new Docxtemplater(zip, {
-    paragraphLoop: true,
-    linebreaks: true,
-    delimiters: { start: '{{', end: '}}' },
-  } as Record<string, unknown>)
-  doc.setData(data)
-  doc.render()
+  // 替换所有 worksheet XML
+  const sheetFiles = zip.file(/xl\/worksheets\/sheet\d+\.xml/)
+  for (const file of sheetFiles) {
+    const xml = await file.async('string')
+    const replaced = replaceVariablesInXml(xml, data)
+    zip.file(file.name, replaced)
+  }
 
-  const blob = doc.getZip().generate({
+  const blob = await zip.generateAsync({
     type: 'blob',
-    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  }) as Blob
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
 
-  const fileName = `${template.name}_${formatDate(new Date())}.docx`
+  const fileName = `${template.name}_${formatDate(new Date())}.xlsx`
   return { blob, fileName, manualVariables: [], missingRequired: [] }
 }
 

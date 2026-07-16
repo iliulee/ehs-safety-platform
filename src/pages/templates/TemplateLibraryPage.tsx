@@ -11,9 +11,9 @@ import { TemplateToolbar } from './components/TemplateToolbar'
 import { TemplateList } from './components/TemplateList'
 import { TemplateSheets } from './components/TemplateSheets'
 import { MoveCategoryDialog } from './components/MoveCategoryDialog'
-import CategoryTree from '@/components/business/CategoryTree'
+import CategoryTreeNew from '@/components/business/CategoryTreeNew'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import type { Template, VariableMapping } from '@/types'
+import type { Template } from '@/types'
 import { toast } from 'sonner'
 
 export default function TemplateLibraryPage() {
@@ -24,13 +24,12 @@ export default function TemplateLibraryPage() {
     activeCategoryId,
     activeCategoryName,
     handleCategorySelect,
-    categoryTree,
+    categories,
     templateCounts,
+    uncategorizedCount,
     refreshTree,
   } = useTemplateLibrary()
 
-  const [selected, setSelected] = useState<Template | null>(null)
-  const [editedMappings, setEditedMappings] = useState<VariableMapping[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [moveOpen, setMoveOpen] = useState(false)
@@ -51,17 +50,11 @@ export default function TemplateLibraryPage() {
     }
   }
 
-  const openVariablesSheet = (template: Template) => {
-    setSelected(template)
-    setEditedMappings(template.variableMappings ?? [])
-  }
-
   const handleDelete = async (id: string) => {
     if (!id || deletingIds.has(id)) return
     if (!confirm('确定删除这个模板吗？')) return
 
     // 先清 UI 态，再删数据库，避免 useLiveQuery 重渲染时读到已删除数据
-    if (selected?.id === id) setSelected(null)
     setSelectedIds((prev) => {
       const next = new Set(prev)
       next.delete(id)
@@ -130,30 +123,6 @@ export default function TemplateLibraryPage() {
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  const handleDragMove = async (categoryId: string | null, templateIds: string[]) => {
-    if (templateIds.length === 0) return
-    setMovingIds((prev) => {
-      const next = new Set(prev)
-      templateIds.forEach((id) => next.add(id))
-      return next
-    })
-    try {
-      for (const id of templateIds) {
-        await templateRepo.update(id, { categoryId } as Partial<Template>)
-      }
-      toast.success(`已移动 ${templateIds.length} 个模板`)
-      setSelectedIds(new Set())
-    } catch (err) {
-      toast.error('移动失败：' + (err instanceof Error ? err.message : '未知错误'))
-    } finally {
-      setMovingIds((prev) => {
-        const next = new Set(prev)
-        templateIds.forEach((id) => next.delete(id))
-        return next
-      })
-    }
-  }
-
   const confirmMove = async (categoryId: string | null) => {
     const ids = moveTarget ? [moveTarget.id!] : Array.from(selectedIds)
     if (ids.length === 0) return
@@ -181,17 +150,6 @@ export default function TemplateLibraryPage() {
     }
   }
 
-  const handleSaveMappings = async () => {
-    if (!selected?.id) return
-    try {
-      await templateRepo.updateVariableMappings(selected.id, editedMappings)
-      toast.success('变量映射已保存')
-      setSelected((prev) => (prev ? { ...prev, variableMappings: editedMappings } : prev))
-    } catch (err) {
-      toast.error('保存失败：' + (err instanceof Error ? err.message : '未知错误'))
-    }
-  }
-
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -211,13 +169,13 @@ export default function TemplateLibraryPage() {
 
   return (
     <div className="flex min-h-[calc(100vh-120px)] min-w-0">
-      <aside className="relative flex-shrink-0 h-full w-56">
-        <CategoryTree
-          tree={categoryTree}
+      <aside className="relative flex-shrink-0 h-full min-w-[220px] w-[250px]">
+        <CategoryTreeNew
+          categories={categories}
           templateCounts={templateCounts}
+          uncategorizedCount={uncategorizedCount}
           selectedId={activeCategoryId}
           onSelect={handleCategorySelect}
-          onDropTemplate={handleDragMove}
           onTreeMutated={refreshTree}
         />
       </aside>
@@ -255,9 +213,7 @@ export default function TemplateLibraryPage() {
               onToggleSelectAll={toggleSelectAll}
               onClearSelection={() => setSelectedIds(new Set())}
               onGenerate={generateOps.handleGenerate}
-              onEdit={openVariablesSheet}
               onOpenEditor={openEditorInNewPage}
-              onVariables={openVariablesSheet}
               onDelete={handleDelete}
               onMove={handleMove}
               onDragStart={handleDragStart}
@@ -297,13 +253,6 @@ export default function TemplateLibraryPage() {
         setImportStrategy={importOps.setImportStrategy}
         onExecuteImport={importOps.handleExecuteImport}
         uploading={importOps.uploading}
-        selected={selected}
-        setSelected={setSelected}
-        editedMappings={editedMappings}
-        setEditedMappings={setEditedMappings}
-        onSaveMappings={handleSaveMappings}
-        onGenerate={() => selected && generateOps.handleGenerate(selected)}
-        generating={generateOps.generating}
         batchOpen={generateOps.batchOpen}
         setBatchOpen={generateOps.setBatchOpen}
         batchResult={generateOps.batchResult}

@@ -81,7 +81,40 @@ ${userInput}
 - 隐患等级：general(一般) / major(较大) / critical(重大)
 - 隐患状态：pending(待整改) / rectifying(整改中) / closed(已关闭)
 - 天气：晴/多云/阴/雨/雪/雾 之一
-- 温度：数字，无单位`
+- 温度：数字，无单位
+- 隐患(hazards)：date 和 title 是必填，没填的整条不要写
+- 处罚(penalties)：date 和 targetName 是必填，没填的整条不要写
+- 不要写"{}"空对象或"未填写"占位符，没把握就整个数组不写`
+}
+
+/**
+ * 容错清洗：过滤掉 AI 返回的"半成品"隐患/处罚
+ * 规避 zod 校验失败（hazards[0].date/title 或 penalties[0].date/targetName 缺失）
+ */
+function cleanParsedData(data: Record<string, unknown>): Record<string, unknown> {
+  // 过滤掉没填关键字段的隐患
+  if (Array.isArray(data.hazards)) {
+    const filtered = (data.hazards as Array<Record<string, unknown>>).filter(
+      (h) => h && typeof h.date === 'string' && typeof h.title === 'string'
+    )
+    if (filtered.length === 0) {
+      delete data.hazards
+    } else {
+      data.hazards = filtered
+    }
+  }
+  // 过滤掉没填关键字段的处罚
+  if (Array.isArray(data.penalties)) {
+    const filtered = (data.penalties as Array<Record<string, unknown>>).filter(
+      (p) => p && typeof p.date === 'string' && typeof p.targetName === 'string'
+    )
+    if (filtered.length === 0) {
+      delete data.penalties
+    } else {
+      data.penalties = filtered
+    }
+  }
+  return data
 }
 
 class AiParserService {
@@ -115,8 +148,9 @@ class AiParserService {
         // 兼容 AI 返回带 markdown 代码块包裹的情况
         const jsonMatch = response.match(/\{[\s\S]*\}/)
         const jsonStr = jsonMatch ? jsonMatch[0] : response
-        const parsed = JSON.parse(jsonStr)
-        return ParsedDailyDataSchema.parse(parsed)
+        const rawParsed = JSON.parse(jsonStr) as Record<string, unknown>
+        const cleaned = cleanParsedData(rawParsed)
+        return ParsedDailyDataSchema.parse(cleaned)
       } catch (err) {
         if (err instanceof z.ZodError) {
           throw new AIParseError(`AI 返回格式异常：${err.message}`)

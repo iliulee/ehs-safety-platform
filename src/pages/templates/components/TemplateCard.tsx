@@ -1,4 +1,4 @@
-import { FileText, FileSpreadsheet, FileType, Presentation, Star, Clock, FileDown, Trash2, CheckSquare, Square, FolderInput, SlidersHorizontal, Edit3 } from 'lucide-react'
+import { FileText, FileSpreadsheet, FileType, Presentation, Star, Clock, FileDown, Trash2, CheckSquare, Square, FolderInput, Edit3 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { Template } from '@/types'
@@ -29,9 +29,7 @@ interface TemplateCardProps {
   deleting?: boolean
   onToggleSelect: () => void
   onGenerate: () => void
-  onEdit: () => void
   onOpenEditor?: () => void
-  onVariables?: () => void
   onDelete: () => void
   onMove?: () => void
   onDragStart?: (e: React.DragEvent) => void
@@ -43,9 +41,7 @@ export function TemplateCard({
   deleting = false,
   onToggleSelect,
   onGenerate,
-  onEdit,
   onOpenEditor,
-  onVariables,
   onDelete,
   onMove,
   onDragStart,
@@ -56,7 +52,7 @@ export function TemplateCard({
   return (
     <Card
       className={`group cursor-pointer transition-all hover:border-gray-300 hover:shadow-sm ${selected ? 'ring-1 ring-emerald-500 bg-emerald-50/30' : ''} ${deleting ? 'opacity-60 pointer-events-none' : ''}`}
-      onClick={deleting ? undefined : (isEditable ? onOpenEditor : onEdit)}
+      onClick={deleting ? undefined : (isEditable && onOpenEditor ? onOpenEditor : undefined)}
       draggable={!deleting && !!onDragStart}
       onDragStart={onDragStart}
     >
@@ -113,19 +109,6 @@ export function TemplateCard({
               <FileDown className="w-3.5 h-3.5" />
               生成
             </button>
-            {isEditable && onVariables && (
-              <button
-                disabled={deleting}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onVariables()
-                }}
-                className="h-9 w-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-gray-400 hover:text-slate-600 transition-colors disabled:opacity-50"
-                title="变量映射"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-              </button>
-            )}
             {isEditable && onOpenEditor && (
               <button
                 disabled={deleting}

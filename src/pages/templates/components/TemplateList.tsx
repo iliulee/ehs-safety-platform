@@ -12,9 +12,7 @@ interface TemplateListProps {
   onToggleSelectAll: () => void
   onClearSelection: () => void
   onGenerate: (t: Template) => void
-  onEdit: (t: Template) => void
   onOpenEditor?: (t: Template) => void
-  onVariables?: (t: Template) => void
   onDelete: (id: string) => void
   onMove?: (t: Template) => void
   onDragStart?: (e: React.DragEvent, template: Template) => void
@@ -31,9 +29,7 @@ export function TemplateList({
   onToggleSelectAll,
   onClearSelection,
   onGenerate,
-  onEdit,
   onOpenEditor,
-  onVariables,
   onDelete,
   onMove,
   onDragStart,
@@ -62,9 +58,7 @@ export function TemplateList({
           deleting={busyIds.has(t.id!)}
           onToggleSelect={() => onToggleSelect(t.id!)}
           onGenerate={() => onGenerate(t)}
-          onEdit={() => onEdit(t)}
           onOpenEditor={onOpenEditor ? () => onOpenEditor(t) : undefined}
-          onVariables={onVariables ? () => onVariables(t) : undefined}
           onDelete={() => onDelete(t.id!)}
           onMove={onMove ? () => onMove(t) : undefined}
           onDragStart={onDragStart ? (e) => onDragStart(e, t) : undefined}

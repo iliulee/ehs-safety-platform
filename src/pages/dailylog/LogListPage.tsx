@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Search, ChevronRight, Thermometer, User, AlertTriangle, ClipboardList, ShieldCheck, Edit3, Trash2 } from 'lucide-react'
+import { Search, ChevronRight, Thermometer, User, AlertTriangle, ClipboardList, ShieldCheck, Edit3, Trash2, Sparkles, Loader2, FileDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,13 @@ import { Empty } from '@/components/ui/empty'
 import { FloatingButton } from '@/components/ui/floating-button'
 import { getCurrentProjectId } from '@/store'
 import { dailyLogService } from '@/services/dailyLogService'
+import { educationService } from '@/services/educationService'
+import { hazardService } from '@/services/hazardService'
+import { aiParser, type ParsedDailyData } from '@/services/ai-parser.service'
+import { matchWorkers } from '@/services/worker-matcher.service'
+import { generateAndDownloadDailyLog } from '@/services/generate-daily-log.service'
+import { AIParseError } from '@/types/errors'
+import { toast } from 'sonner'
 import type { DailyLog } from '@/types'
 
 const WEATHER_OPTIONS = [
@@ -48,6 +55,7 @@ export default function LogListPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [detailLog, setDetailLog] = useState<DailyLog | null>(null)
   const [editLog, setEditLog] = useState<DailyLog | null>(null)
+  const [aiParseOpen, setAiParseOpen] = useState(false)
 
   const loadLogs = async () => {
     setLoading(true)
@@ -108,14 +116,25 @@ export default function LogListPage() {
           </div>
         </div>
 
-        <div className="relative mb-3">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="搜索日志内容..."
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            className="pl-8 h-9"
-          />
+        <div className="flex items-center gap-2 mb-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="搜索日志内容..."
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              className="pl-8 h-9"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-50"
+            onClick={() => setAiParseOpen(true)}
+          >
+            <Sparkles className="w-4 h-4" />
+            AI 拆解
+          </Button>
         </div>
       </div>
 
@@ -205,7 +224,247 @@ export default function LogListPage() {
           log={editLog}
         />
       )}
+
+      <AiParseSheet
+        open={aiParseOpen}
+        onClose={() => setAiParseOpen(false)}
+        onSuccess={() => { setAiParseOpen(false); loadLogs() }}
+      />
     </div>
+  )
+}
+
+/**
+ * AI 文字拆解面板
+ * 用户输入工地口述文字 → AI 拆解为结构化数据 → 用户确认后写入各业务表
+ */
+function AiParseSheet({ open, onClose, onSuccess }: {
+  open: boolean
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [inputText, setInputText] = useState('')
+  const [parsing, setParsing] = useState(false)
+  const [result, setResult] = useState<ParsedDailyData | null>(null)
+  const [writing, setWriting] = useState(false)
+  const [generatingDoc, setGeneratingDoc] = useState(false)
+  const [unmatchedNames, setUnmatchedNames] = useState<string[]>([])
+
+  const handleParse = async () => {
+    if (!inputText.trim()) {
+      toast.error('请输入待拆解的文字')
+      return
+    }
+    setParsing(true)
+    setUnmatchedNames([])
+    try {
+      const parsed = await aiParser.parseDailyNarrative(inputText, getCurrentProjectId())
+      setResult(parsed)
+      toast.success('AI 拆解完成，请核对后写入')
+    } catch (err) {
+      if (err instanceof AIParseError) {
+        toast.error(err.message)
+      } else {
+        toast.error('AI 拆解失败：' + (err instanceof Error ? err.message : '未知错误'))
+      }
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  const handleConfirmWrite = async () => {
+    if (!result) return
+    setWriting(true)
+    try {
+      const projectId = getCurrentProjectId()
+      let writeCount = 0
+      const allUnmatched: string[] = []
+
+      // 1. 写入安全日志
+      if (result.dailyLog) {
+        await dailyLogService.create({
+          date: result.dailyLog.date,
+          weather: result.dailyLog.weather,
+          temperature: result.dailyLog.temperature?.toString(),
+          workContent: result.dailyLog.workContent,
+          safetyMeasures: result.dailyLog.safetyMeasures,
+          issuesFound: result.dailyLog.issues,
+          projectId,
+        })
+        writeCount++
+      }
+
+      // 2. 写入安全教育记录
+      if (result.educationRecords?.length) {
+        for (const edu of result.educationRecords) {
+          const { matched, unmatched } = await matchWorkers(edu.attendeeNames, projectId)
+          if (unmatched.length) allUnmatched.push(...unmatched)
+          await educationService.create({
+            title: edu.topic,
+            date: edu.date,
+            attendeeIds: Array.from(matched.values()),
+            content: `参会人员：${edu.attendeeNames.join('、')}`,
+            projectId,
+          })
+          writeCount++
+        }
+      }
+
+      // 3. 写入隐患记录（AI 的 critical 映射为 serious）
+      if (result.hazards?.length) {
+        for (const h of result.hazards) {
+          await hazardService.create({
+            title: h.title,
+            description: `日期：${h.date}${h.location ? `；位置：${h.location}` : ''}`,
+            level: h.level === 'critical' ? 'serious' : h.level,
+            status: h.status,
+            location: h.location,
+            source: 'ai',
+            projectId,
+          })
+          writeCount++
+        }
+      }
+
+      setUnmatchedNames(allUnmatched)
+      if (allUnmatched.length > 0) {
+        toast.warning(`已写入 ${writeCount} 条记录，${allUnmatched.length} 名工人未匹配：${allUnmatched.join('、')}`)
+      } else {
+        toast.success(`已写入 ${writeCount} 条记录`)
+      }
+      onSuccess()
+    } catch (err) {
+      toast.error('写入失败：' + (err instanceof Error ? err.message : '未知错误'))
+    } finally {
+      setWriting(false)
+    }
+  }
+
+  const handleGenerateDoc = async () => {
+    if (!result?.dailyLog) {
+      toast.info('请先完成 AI 拆解')
+      return
+    }
+    setGeneratingDoc(true)
+    try {
+      const out = await generateAndDownloadDailyLog({ data: result })
+      if (out.residualVariables.length > 0) {
+        toast.warning(`已生成 Word，但有 ${out.residualVariables.length} 个变量未替换：${out.residualVariables.join('、')}`)
+      } else {
+        toast.success(`已生成：${out.fileName}`)
+      }
+    } catch (err) {
+      toast.error('生成 Word 失败：' + (err instanceof Error ? err.message : '未知错误'))
+    } finally {
+      setGeneratingDoc(false)
+    }
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="AI 文字拆解 → 安全日志"
+      footer={
+        <>
+          <Button variant="outline" className="flex-1" onClick={onClose}>取消</Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={handleGenerateDoc}
+            disabled={!result || generatingDoc}
+          >
+            {generatingDoc
+              ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />生成中...</>
+              : <><FileDown className="w-4 h-4 mr-1" />生成日志 Word</>}
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={handleConfirmWrite}
+            disabled={!result || writing}
+          >
+            {writing ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />写入中...</> : '确认写入'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {/* 输入区 */}
+        <FormField label="工地口述文字">
+          <Textarea
+            rows={4}
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            placeholder="例：今天没有危大作业。上午9点开展了进场安全教育，人员是张三、李四、王二、马波。下午进行了塔吊月度验收。3点发现一处临边防护缺失，已通知整改。今天天气晴，30度。"
+          />
+        </FormField>
+
+        <Button
+          className="w-full"
+          onClick={handleParse}
+          disabled={parsing || !inputText.trim()}
+        >
+          {parsing ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />AI 拆解中（最长 30 秒）...</>
+          ) : (
+            <><Sparkles className="w-4 h-4 mr-2" />开始 AI 拆解</>
+          )}
+        </Button>
+
+        {/* 拆解结果 */}
+        {result && (
+          <div className="space-y-3 pt-2 border-t border-gray-100">
+            {result.dailyLog && (
+              <div className="bg-blue-50 rounded-lg p-3 space-y-1.5">
+                <p className="text-xs text-blue-700 font-medium flex items-center gap-1">
+                  <ClipboardList className="w-3 h-3" />安全日志
+                </p>
+                <div className="text-sm text-gray-800 space-y-0.5">
+                  <p>📅 日期：{result.dailyLog.date}</p>
+                  {result.dailyLog.weather && <p>🌤 天气：{result.dailyLog.weather}</p>}
+                  {result.dailyLog.temperature !== undefined && <p>🌡 温度：{result.dailyLog.temperature}℃</p>}
+                  {result.dailyLog.workContent && <p>📝 施工内容：{result.dailyLog.workContent}</p>}
+                  {result.dailyLog.safetyMeasures && <p>🛡 安全措施：{result.dailyLog.safetyMeasures}</p>}
+                  {result.dailyLog.issues && <p>⚠️ 问题：{result.dailyLog.issues}</p>}
+                </div>
+              </div>
+            )}
+
+            {result.educationRecords?.length ? (
+              <div className="bg-emerald-50 rounded-lg p-3 space-y-1.5">
+                <p className="text-xs text-emerald-700 font-medium flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />安全教育（{result.educationRecords.length}）
+                </p>
+                {result.educationRecords.map((edu, i) => (
+                  <div key={i} className="text-sm text-gray-800">
+                    {edu.date} - {edu.topic}：{edu.attendeeNames.join('、')}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {result.hazards?.length ? (
+              <div className="bg-red-50 rounded-lg p-3 space-y-1.5">
+                <p className="text-xs text-red-700 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />隐患记录（{result.hazards.length}）
+                </p>
+                {result.hazards.map((h, i) => (
+                  <div key={i} className="text-sm text-gray-800">
+                    {h.date} - {h.title}（{h.level === 'critical' ? '重大' : h.level === 'major' ? '较大' : '一般'}，{h.status === 'pending' ? '待整改' : h.status === 'rectifying' ? '整改中' : '已关闭'}）
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {unmatchedNames.length > 0 && (
+              <div className="bg-amber-50 rounded-lg p-3 text-xs text-amber-700">
+                ⚠️ 以下工人未在工人表中找到，教育记录的参会人将缺失：{unmatchedNames.join('、')}。请先到「人员管理」录入这些工人。
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Sheet>
   )
 }
 

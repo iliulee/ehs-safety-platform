@@ -3,6 +3,15 @@ import type { Template } from '@/types'
 import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 
+function addCleanVar(raw: string, vars: Set<string>): void {
+  const name = raw.trim().replace(/^[#/%]/, '').split('|')[0].trim()
+  if (!name) return
+  if (name.includes(' ') || name.includes('/')) return
+  if (/^\d+$/.test(name)) return
+  if (/^[a-z]+:/i.test(name)) return
+  vars.add(name)
+}
+
 export const templateService = {
   async list(): Promise<Template[]> {
     return db.templates.orderBy('createdAt').reverse().toArray()
@@ -51,7 +60,7 @@ export const templateService = {
       }
       const record = obj as Record<string, unknown>
       if (record.tag && typeof record.tag === 'string') {
-        vars.add(record.tag)
+        addCleanVar(record.tag, vars)
       }
       Object.values(record).forEach(walk)
     }
@@ -62,7 +71,7 @@ export const templateService = {
     const regex = /\{([^}]+)\}/g
     let match: RegExpExecArray | null
     while ((match = regex.exec(xml)) !== null) {
-      vars.add(match[1].trim())
+      addCleanVar(match[1], vars)
     }
 
     return Array.from(vars)

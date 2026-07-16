@@ -27,13 +27,23 @@ export function useTemplateGenerate() {
   }
 
   const executeRender = async (template: Template) => {
-    setGenerating(true)
     try {
+      if (!project?.id) {
+        toast.error('请先在左下角选择一个项目')
+        return
+      }
       if (template.isBuiltIn && !template.content) {
         toast.info('内置模板需先上传对应 Word 模板文件才能生成')
         return
       }
-      const result = await renderSingle(template.id!, { projectId: project?.id, manualValues })
+      setGenerating(true)
+      const result = await renderSingle(template.id!, { projectId: project.id, manualValues })
+      if (result.residualVariables && result.residualVariables.length > 0) {
+        toast.warning(
+          `文档中有 ${result.residualVariables.length} 个变量未被替换（如 ${result.residualVariables.slice(0, 3).join('、')}），请检查变量名是否与模板中的占位符一致`,
+          { duration: 6000 }
+        )
+      }
       if (result.manualVariables.length > 0) {
         setManualTemplate(template)
         setManualVariables(result.manualVariables)

@@ -2,7 +2,7 @@
 
 > Trae 每次开新会话自动加载本文件。不要删除。
 
-## 🎯 v6.0 MVP 切入口（2 天交付）
+## 🎯 v5.0 MVP 切入口（2 天交付）
 
 **目标**：以"安全施工日志"为引爆点，跑通最小可用闭环。
 
@@ -29,13 +29,13 @@
 - 一键生成当天的安全施工日志 Word
 - tsc + vite build 门禁通过 → commit
 
-### 暂不做（v6.0 范围外）
+### 暂不做（v5.0 范围外）
 - 模板编辑器修复（已知 3 个 bug）
 - 自然语言录入 UI（用微信输入法解决）
 - 复杂排版/打印
 - 多用户协作
 
-### 禁止重写（v6.0 期间）
+### 禁止重写（v5.0 期间）
 - docxtemplater / ExcelJS / Dexie.js / shadcn/ui / MiniSearch / mammoth / pdfjs-dist / **tesseract.js**
 - 不动 src/pages/templates/（3 个 bug 还没修）
 - 不动 v5.0 已完成的 4 个模块（分词 / AI 调用 / 切分 / 检索）
@@ -54,13 +54,13 @@
 
 打开本会话后，**立即**读取以下三个文件以获取完整上下文：
 
-1. `PROJECT-SPEC-v5.md` — **当前规范**（v5.0 MVP 切入口，以安全施工日志为引爆点）
+1. `PROJECT-SPEC-v5.md` — **当前规范**（v5.0 MVP 切入口，以安全施工日志为引爆点；**§12.7 包含表单布局和 OCR 设计原则**）
 2. `VIBE_CODING_PROMPT.md` — 编码规范、拼好码原则、质量门禁（工作手册）
 3. `PROJECT-new_SPEC.md` — 历史 v4.1.3 全功能规范（仅用于对照，不作为开发依据）
 
 ## 一句话定位
 
-溜哥（大理机场改扩建项目安全总监）的安全管理桌面应用。Electron + React 18 + TypeScript 5 + Tailwind 3 + shadcn/ui。独立 exe，不依赖 WPS。**v5.0 聚焦安全施工日志 MVP，不做功能蔓延。**
+溜哥（大理机场改扩建项目安全总监）的安全管理桌面应用。Electron + React 18 + TypeScript 5 + Tailwind 3 + shadcn/ui。**v5.0 聚焦安全施工日志 MVP，不做功能蔓延。**（当前以 Vite dev server 运行，v5.1 打包为独立 exe。）
 
 ## 核心铁律（拼好码）
 
@@ -72,7 +72,7 @@
 - 写完必须跑 `npx tsc --noEmit && npx vite build`，零错误才算过
 - 不自审自过 → 用门禁说话
 - 不确定就问 → 不猜测用户意图
-- 禁止重写：docxtemplater / ExcelJS / Dexie.js / shadcn/ui / MiniSearch / mammoth / pdfjs-dist
+- 禁止重写：docxtemplater / ExcelJS / Dexie.js / shadcn/ui / MiniSearch / mammoth / pdfjs-dist / tesseract.js
 
 ## 技术栈速查
 
@@ -94,6 +94,7 @@
 | AI | openai (OpenAI SDK) | 4+ ✅ |
 | 切分 | @langchain/textsplitters | latest ✅ |
 | 分词 | @node-rs/jieba | latest ✅ |
+| OCR | tesseract.js | 7+ ✅ |
 
 ## 已知待修 Bug（v5.0 改造期间不要动这些区域）
 

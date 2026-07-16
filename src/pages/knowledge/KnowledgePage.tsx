@@ -151,8 +151,8 @@ export default function KnowledgePage() {
       const docId = 'doc_' + ts
       const chunks: KnowledgeChunk[] = []
       const { chunkText } = await import('@/services/chunker.service')
-      const { tokenize } = await import('@/services/bm25.service')
-      const chunkTexts = chunkText(newContent.trim(), newTitle.trim())
+      const { tokenize } = await import('@/services/mini-search.adapter')
+      const chunkTexts = await chunkText(newContent.trim(), newTitle.trim())
       for (let i = 0; i < chunkTexts.length; i++) {
         chunks.push({
           id: 'chunk_' + ts + '_' + i,

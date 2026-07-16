@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, ChevronDown } from 'lucide-react'
+import { ArrowLeft, FileText, ChevronDown, Bot } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { StructuredReportForm } from '@/components/ai/StructuredReportForm'
 import { InheritSelector } from '@/components/ai/InheritSelector'
 import TemplateSelectDialog from '@/components/business/TemplateSelectDialog'
+import { AiParseDialog } from './components/AiParseDialog'
 import { generateAndDownload } from '@/services/generate.service'
 import { hazardService } from '@/services/hazardService'
 import { educationService } from '@/services/educationService'
@@ -33,6 +34,7 @@ export default function DailyReportPage() {
   const [showInheritSelector, setShowInheritSelector] = useState(false)
   const [initialFormData, setInitialFormData] = useState<Partial<DailyReportFormData>>({})
   const [inheritedKeys, setInheritedKeys] = useState<string[]>([])
+  const [aiParseOpen, setAiParseOpen] = useState(false)
 
   useEffect(() => {
     templateService.list().then((list) => {
@@ -87,6 +89,12 @@ export default function DailyReportPage() {
 
   const handleInheritSkip = () => {
     setShowInheritSelector(false)
+  }
+
+  /** AI 拆解结果应用到表单 */
+  const handleAiApply = (data: Partial<DailyReportFormData>) => {
+    setInitialFormData((prev) => ({ ...prev, ...data }))
+    setInheritedKeys([])
   }
 
   const saveBusinessData = async (data: DailyReportSubmitData) => {
@@ -219,6 +227,15 @@ export default function DailyReportPage() {
           </div>
           <div className="flex items-center gap-2">
             <Button
+              variant="default"
+              size="sm"
+              className="h-9 gap-1.5 text-sm font-normal bg-blue-600 hover:bg-blue-700"
+              onClick={() => setAiParseOpen(true)}
+            >
+              <Bot className="w-4 h-4" />
+              <span>AI 拆解</span>
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               className="h-9 gap-1.5 text-sm font-normal"
@@ -269,6 +286,13 @@ export default function DailyReportPage() {
         templates={templates}
         selectedId={selectedTemplateId}
         onSelect={setSelectedTemplateId}
+      />
+
+      <AiParseDialog
+        open={aiParseOpen}
+        onClose={() => setAiParseOpen(false)}
+        projectId={getCurrentProjectId() ?? undefined}
+        onApply={handleAiApply}
       />
     </div>
   )
